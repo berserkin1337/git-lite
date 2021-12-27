@@ -1,0 +1,19 @@
+name: gitlet
+version: "1.0"
+author: Aviral Gupta <gaviral373@gmail.com>
+about: implementation of git in rust.
+args:
+  - verbose:
+      short: v
+      multiple: true
+      help: Sets the level of verbosity
+subcommands:
+  - init:
+      about: Creates a new git repository or reinitializes an existing one.
+      args:
+        - path:
+            index: 1
+            takes_value: true
+            value_name: path
+            help: specifies the repository's path.
+      
