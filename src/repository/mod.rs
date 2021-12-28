@@ -9,6 +9,7 @@ use flate2::read::ZlibDecoder;
 use flate2::write::ZlibEncoder;
 use flate2::Compression;
 use sha1::Sha1;
+use std::collections::BTreeMap;
 use std::io::{Read, Write};
 use std::{
     fs::{create_dir_all, File},
@@ -228,5 +229,74 @@ impl GitRepository {
                     e.to_string()
                 ))
             })
+    }
+    // It parses commit puts it into an ordered hash map.
+    pub fn commit_parse(raw: &[u8]) -> BTreeMap<String, Vec<u8>> {
+        let buf = raw.to_vec();
+        let mut result = BTreeMap::new();
+
+        let mut current: usize = 0;
+
+        while current < buf.len() {
+            let space = buf.iter().position(|b| b == &b' ');
+            let nl = buf.iter().position(|b| b == &b'\n');
+            if space.is_none() || (nl.is_some() && space.unwrap() < nl.unwrap()) {
+                result.insert("data".to_owned(), buf[current + 1..].to_vec());
+                return result;
+            }
+
+            let space_pos = space.unwrap();
+            let key = String::from_utf8(buf[current..space_pos].to_vec()).unwrap();
+
+            // Find the end of the value.  Continuation lines begin with a
+            // space, so we loop until we find a "\n" not followed by a space.
+
+            let mut it = space_pos + 1;
+            let end_pos = loop {
+                let newline = buf[it..].iter().position(|b| b == &b'\n');
+                if newline.is_none() {
+                    break buf.len();
+                } else {
+                    let newline_pos = newline.unwrap();
+                    if buf[newline_pos + 1] != b' ' {
+                        break newline_pos;
+                    }
+                    it = newline_pos + 1;
+                }
+            };
+            let mut value =
+                GitRepository::remove_spaces_after_newline(&buf[space_pos + 1..end_pos]);
+
+            // Don't overwrite existing value, but append to it
+            if result.contains_key(&key) {
+                let mut previous = result.get(&key).unwrap().to_vec();
+                previous.append(&mut value);
+                result.insert(key, previous);
+            } else {
+                result.insert(key, value);
+            }
+
+            current = end_pos + 1;
+        }
+
+        result
+    }
+    fn remove_spaces_after_newline(input: &[u8]) -> Vec<u8> {
+        if input.len() <= 1 {
+            return Vec::from(input);
+        }
+
+        let mut result = Vec::new();
+        let mut idx = 1;
+        while idx < input.len() + 1 {
+            result.push(input[idx - 1]);
+            if idx < input.len() && input[idx - 1] == b'\n' && input[idx] == b' ' {
+                idx += 2;
+            } else {
+                idx += 1;
+            }
+        }
+
+        result
     }
 }
