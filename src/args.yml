@@ -16,4 +16,19 @@ subcommands:
             takes_value: true
             value_name: path
             help: specifies the repository's path.
+  - cat-file:
+      about: Provide content or type and size information for repository objects
+      args:
+        - type :
+            index: 1
+            takes_value: true
+            value_name: TYPE
+            help: specify the type of the object
+        
+        - object :
+            index: 2
+            takes_value: true
+            value_name: object
+            help: The name of the object to show
+
       

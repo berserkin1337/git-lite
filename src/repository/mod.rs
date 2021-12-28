@@ -1,12 +1,14 @@
 pub mod config;
-
-use configparser::ini::Ini;
-
+pub mod object;
 use self::config::GitConfig;
-use crate::{error::GitError, files};
+use self::object::{GitObject, ObjType, Serializable};
 use crate::files::is_dir_empty;
+use crate::{error::GitError, files};
+use configparser::ini::Ini;
+use flate2::read::ZlibDecoder;
+use std::io::Read;
 use std::{
-    fs::create_dir_all,
+    fs::{create_dir_all, File},
     path::{Path, PathBuf},
 };
 
@@ -75,7 +77,8 @@ impl GitRepository {
             &path!("description"),
             "Unnamed repository; edit this file 'description' to name the repository.",
         )?;
-        GitRepository::create_repo_file(&repo, &path!("HEAD"), "ref: refs/heads/master")?;        let default_config: GitConfig = Default::default();
+        GitRepository::create_repo_file(&repo, &path!("HEAD"), "ref: refs/heads/master")?;
+        let default_config: GitConfig = Default::default();
         let config = repo.repo_file(&path!("config"))?;
         default_config.save(&config).unwrap();
 
@@ -111,5 +114,84 @@ impl GitRepository {
     fn create_repo_file(repo: &GitRepository, path: &Path, contents: &str) -> Result<(), GitError> {
         let file = repo.repo_file(path)?;
         files::create_write_file(&file, contents)
+    }
+
+    // Loads an existing git repository
+    pub fn load(path: &Path) -> Result<GitRepository, GitError> {
+        let gitdir = path.join(path!(".git"));
+        let conf_path = gitdir.join(&path!("config"));
+        let mut conf = Ini::new();
+        conf.load(&conf_path).map_err(|e| {
+            GitError::GenericError(format!(
+                "Unable to load git config for repo: {}, {}",
+                conf_path.to_str().unwrap(),
+                e.to_string()
+            ))
+        })?;
+        Ok(GitRepository {
+            worktree: path.to_path_buf(),
+            gitdir,
+            config: GitConfig::new(conf),
+        })
+    }
+
+    // This function tries to find a git repository from the current working directory.
+    pub fn find() -> Result<GitRepository, GitError> {
+        let cwd = files::cwd()?;
+        let mut some = Some(cwd);
+
+        while some.is_some() {
+            let current = some.as_ref().unwrap();
+            let path = current.join(path!(".git"));
+
+            if path.exists() {
+                return Ok(GitRepository::load(&current)?);
+            }
+            some = some.unwrap().parent().map(|p| p.to_path_buf());
+        }
+        Err(GitError::GenericError(
+            "Git repository could not be found.".to_owned(),
+        ))
+    }
+
+    pub fn find_object(&self, name: &str, _format: &ObjType) -> String {
+        name.to_owned()
+    }
+
+    pub fn read_object(&self, sha: &str) -> Result<GitObject, GitError> {
+        let dir = &sha[0..2];
+        let rest = &sha[2..];
+
+        let object = self.repo_file(&path!("objects", dir, rest))?;
+
+        let file = File::open(&object).map_err(|_| {
+            GitError::PathError("Could not open file".to_owned(), object.to_path_buf())
+        })?;
+
+        let mut buf = Vec::new();
+        ZlibDecoder::new(file).read_to_end(&mut buf).map_err(|e| {
+            GitError::GenericError(format!("Could not read object data: {}", e.to_string()))
+        })?;
+        let space = buf.iter().position(|b| b == &b' ').unwrap();
+        let null = buf.iter().position(|b| b == &b'\x00').unwrap();
+        let bytes: &[u8] = buf.as_ref();
+
+        let format = &bytes[0..space];
+        let data = &bytes[null + 1..];
+
+        let size: usize = String::from_utf8(bytes[space..null].to_vec())
+            .unwrap()
+            .trim()
+            .parse()
+            .unwrap();
+
+        if size != buf.len() - null - 1 {
+            return Err(GitError::ObjectError(format!(
+                "Invalid object {0}: bad length",
+                sha
+            )));
+        }
+        let object_type = ObjType::deserialize(format);
+        Ok(GitObject::new(object_type, data))
     }
 }
