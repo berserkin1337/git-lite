@@ -6,7 +6,10 @@ use crate::files::is_dir_empty;
 use crate::{error::GitError, files};
 use configparser::ini::Ini;
 use flate2::read::ZlibDecoder;
-use std::io::Read;
+use flate2::write::ZlibEncoder;
+use flate2::Compression;
+use sha1::Sha1;
+use std::io::{Read, Write};
 use std::{
     fs::{create_dir_all, File},
     path::{Path, PathBuf},
@@ -193,5 +196,37 @@ impl GitRepository {
         }
         let object_type = ObjType::deserialize(format);
         Ok(GitObject::new(object_type, data))
+    }
+
+    pub fn write_object(repo: &GitRepository, obj: &GitObject) -> Result<String, GitError> {
+        let mut data = obj.serialize().to_vec();
+        let mut result = Vec::new();
+        result.append(&mut obj.obj_type.serialize().to_vec());
+        result.push(b' ');
+        result.append(&mut obj.obj_type.serialize().to_vec());
+        result.push(0 as u8);
+        result.append(&mut data);
+
+        let sha = Sha1::from(&result).hexdigest();
+        let path = repo.repo_file(&path!("objects", &sha[0..2], &sha[2..]))?;
+
+        let mut encoder = ZlibEncoder::new(Vec::new(), Compression::new(1));
+
+        encoder
+            .write_all(&mut result)
+            .and(encoder.finish())
+            .and_then(|compressed| {
+                let file = File::create(path)?;
+                Ok((compressed, file))
+            })
+            .and_then(|(compressed, mut file)| file.write_all(&compressed))
+            .and(Ok(sha.to_owned()))
+            .map_err(|e| {
+                GitError::GenericError(format!(
+                    "Unable to compress and save object data: {} - {}",
+                    sha,
+                    e.to_string()
+                ))
+            })
     }
 }

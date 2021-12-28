@@ -30,5 +30,24 @@ subcommands:
             takes_value: true
             value_name: object
             help: The name of the object to show
-
-      
+  - hash-object:
+      about: Compute object ID and optionally creates a blob from a file
+      args: 
+        - type :
+            short: t
+            long: type
+            default_value: blob
+            takes_value: true
+            value_name: TYPE
+            help: specify the object type
+        - write:
+            short: w
+            long: write
+            takes_value: false
+            help: Actually write the object into the database
+        - path:
+            index: 1
+            takes_value: true
+            value_name: PATH
+            help: The path of the object
+ 

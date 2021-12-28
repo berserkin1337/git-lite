@@ -9,3 +9,4 @@ edition = "2021"
 clap = {version="~2.34.0", features = ["yaml"]}
 configparser = "3.0.0"
 flate2 = {default-features = false,features = ["zlib"], version="1.0.22"}
+sha1 = { version = "0.6.0", features = ["std"] }
