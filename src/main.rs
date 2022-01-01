@@ -1,11 +1,10 @@
 #[macro_use]
 extern crate clap;
-use std::path::Path;
-
 use crate::error::GitError;
 use crate::repository::GitRepository;
 use clap::{App, ArgMatches};
 use repository::object::{GitObject, ObjType, Serializable};
+use std::path::Path;
 
 #[macro_use]
 pub mod macros;
@@ -15,7 +14,6 @@ pub mod repository;
 fn main() {
     let yml = load_yaml!("args.yml");
     let app = App::from_yaml(yml).get_matches();
-
     if let Some(app) = app.subcommand_matches("init") {
         init(&app);
     } else if let Some(matches) = app.subcommand_matches("cat-file") {

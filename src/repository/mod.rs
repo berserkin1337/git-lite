@@ -6,6 +6,8 @@ use crate::files::is_dir_empty;
 use crate::{error::GitError, files};
 use configparser::ini::Ini;
 use flate2::read::ZlibDecoder;
+
+use byteorder::{BigEndian, ByteOrder};
 use flate2::write::ZlibEncoder;
 use flate2::Compression;
 use sha1::Sha1;
@@ -23,6 +25,22 @@ pub struct GitRepository {
     pub config: GitConfig,
 }
 
+#[derive(Debug)]
+pub struct GitIndex {
+    pub ctime_s: u32,
+    pub ctime_n: u32,
+    pub mtime_s: u32,
+    pub mtime_n: u32,
+    pub dev: u32,
+    pub ino: u32,
+    pub mode: u32,
+    pub uid: u32,
+    pub gid: u32,
+    pub size: u32,
+    pub sha1: String,
+    pub flags: u16,
+    pub path: String,
+}
 impl GitRepository {
     // Computes a path under the repo's gitdir
     pub fn repo_path(&self, path: &Path) -> PathBuf {
@@ -61,7 +79,7 @@ impl GitRepository {
 
         GitRepository {
             worktree: path.to_path_buf(),
-            gitdir: gitdir,
+            gitdir,
             config: GitConfig::new(conf),
         }
     }
@@ -70,7 +88,7 @@ impl GitRepository {
 
     pub fn write_to_path(path: &Path) -> Result<GitRepository, GitError> {
         let repo = GitRepository::new(path);
-        GitRepository::create_dir(&repo, path)?;
+        GitRepository::create_repo_dir(&repo, path)?;
 
         repo.repo_dir(&path!("branches"), true);
         repo.repo_dir(&path!("objects"), true);
@@ -91,7 +109,7 @@ impl GitRepository {
 
     // This function creates the repository 's base working directory.
     // It will throw an error if the directory already exists and it is not empty, or if the given path is not a directory.
-    pub fn create_dir(repo: &GitRepository, path: &Path) -> Result<(), GitError> {
+    pub fn create_repo_dir(repo: &GitRepository, path: &Path) -> Result<(), GitError> {
         if repo.worktree.exists() {
             if !repo.worktree.is_dir() {
                 return Err(GitError::PathError(
@@ -298,5 +316,82 @@ impl GitRepository {
         }
 
         result
+    }
+
+    pub fn read_index() -> Result<Vec<GitIndex>, GitError> {
+        let data = files::read_data(&path!(".git", "index"));
+
+        if data.is_err() {
+            return Err(GitError::PathError(
+                String::from("reading file"),
+                path!(".git", "index"),
+            ));
+        }
+        let data = data.unwrap();
+        let sha = Sha1::from(&data[..data.len() - 20]).digest().bytes();
+
+        if sha != data[data.len() - 20..] {
+            return Err(GitError::GenericError("Invalid index checksum".to_owned()));
+        }
+        let signature = std::str::from_utf8(&data[0..4]).unwrap();
+
+        if signature != "DIRC" {
+            return Err(GitError::GenericError(format!(
+                "Invalid index signature {}",
+                signature
+            )));
+        }
+
+        let version: u32 = u32::from_be_bytes(data[4..8].try_into().expect("Incorrect length"));
+        if version != 2 {
+            return Err(GitError::GenericError(String::from(
+                "Unsupported version number.",
+            )));
+        }
+        let entry_data = data[12..data.len() - 20].to_vec();
+        let mut i = 0;
+        let mut entries: Vec<GitIndex> = Vec::new();
+        while i + 62 < entry_data.len() {
+            let fields_end = i + 62;
+            let ctime_s = BigEndian::read_u32(&entry_data[i..i + 4]);
+            let ctime_n = BigEndian::read_u32(&entry_data[i + 4..i + 8]);
+            let mtime_s = BigEndian::read_u32(&entry_data[i + 8..i + 12]);
+            let mtime_n = BigEndian::read_u32(&entry_data[i + 12..i + 16]);
+            let dev = BigEndian::read_u32(&entry_data[i + 16..i + 20]);
+            let ino = BigEndian::read_u32(&entry_data[i + 20..i + 24]);
+            let mode = BigEndian::read_u32(&entry_data[i + 24..i + 28]);
+            let uid = BigEndian::read_u32(&entry_data[i + 28..i + 32]);
+            let gid = BigEndian::read_u32(&entry_data[i + 32..i + 36]);
+            let size = BigEndian::read_u32(&entry_data[i + 36..i + 40]);
+            let s_ha1: String = format!("{:x?}", &entry_data[i + 40..i + 60])
+                .split(", ")
+                .collect();
+            let sha1 = s_ha1[1..s_ha1.len() - 1].to_owned();
+            let flags = BigEndian::read_u16(&entry_data[i + 60..i + 62]);
+            let mut path_end = fields_end;
+            while entry_data[path_end] != 0 {
+                path_end += 1;
+            }
+            // let path_end = memchr(b'0', &entry_data[fields_end..]).unwrap();
+            let path = std::str::from_utf8(&entry_data[fields_end..path_end]).unwrap();
+            entries.push(GitIndex {
+                ctime_s,
+                ctime_n,
+                mtime_s,
+                mtime_n,
+                dev,
+                ino,
+                mode,
+                uid,
+                gid,
+                size,
+                sha1,
+                flags,
+                path: path.to_string(),
+            });
+            let entry_len: usize = ((62 + path.len() + 8) / 8) as usize * 8;
+            i += entry_len;
+        }
+        Ok(entries)
     }
 }
