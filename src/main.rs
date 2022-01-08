@@ -11,7 +11,7 @@ pub mod macros;
 pub mod error;
 pub mod files;
 pub mod repository;
-pub mod tests;
+pub mod test;
 fn main() {
     let yml = load_yaml!("args.yaml");
     let app = App::from_yaml(yml).get_matches();
@@ -22,7 +22,7 @@ fn main() {
     } else if let Some(matches) = app.subcommand_matches("hash-object") {
         hash_object(matches).unwrap();
     } else if let Some(matches) = app.subcommand_matches("ls-files") {
-        ls_files();
+        ls_files().unwrap();
     }
 }
 

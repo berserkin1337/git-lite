@@ -12,7 +12,9 @@ use flate2::write::ZlibEncoder;
 use flate2::Compression;
 use sha1::Sha1;
 use std::collections::BTreeMap;
+use std::fs;
 use std::io::{Read, Write};
+use std::ops::RangeBounds;
 use std::{
     fs::{create_dir_all, File},
     path::{Path, PathBuf},
@@ -345,7 +347,8 @@ impl GitRepository {
 
         let version: u32 = u32::from_be_bytes(data[4..8].try_into().expect("Incorrect length"));
 
-        let n_entries: u32 = u32::from_be_bytes(data[8..12].try_into().expect("Invalid index file"));
+        let n_entries: u32 =
+            u32::from_be_bytes(data[8..12].try_into().expect("Invalid index file"));
         if version != 2 {
             return Err(GitError::GenericError(String::from(
                 "Unsupported version number.",
@@ -396,5 +399,16 @@ impl GitRepository {
             i += entry_len;
         }
         Ok(entries)
+    }
+    pub fn write_tree() -> Result<String, GitError> {
+        let tree_entries: Vec<String> = Vec::new();
+        let entries = GitRepository::read_index().unwrap();
+        for entry in entries {
+            if entry.path.contains("/") {
+                panic!("currently only supports a single, top-level directory");
+            }
+            let mode_path = format!("{:o} {}", entry.mode, entry.path);
+        }
+        Ok(String::from("xqcL"))
     }
 }
