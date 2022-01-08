@@ -50,4 +50,6 @@ subcommands:
             takes_value: true
             value_name: PATH
             help: The path of the object
- 
+
+  - ls-files:
+      about: Lists the files in the git index

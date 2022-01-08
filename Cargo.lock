@@ -103,7 +103,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "gitlet"
+name = "git-lite"
 version = "0.1.0"
 dependencies = [
  "byteorder",

@@ -51,13 +51,13 @@ impl GitRepository {
         let path = self.repo_path(path);
         if path.exists() {
             if path.is_dir() {
-                return Some(path.clone());
+                return Some(path);
             } else {
                 return None;
             }
         } else if mkdir {
             create_dir_all(&path).unwrap();
-            return Some(path.clone());
+            return Some(path);
         }
         None
     }
@@ -74,7 +74,7 @@ impl GitRepository {
     }
     // Create a new git repository .
     pub fn new(path: &Path) -> GitRepository {
-        let gitdir = path.join(&path!(".gitdir"));
+        let gitdir = path.join(&path!(".git"));
         let conf = Ini::new();
 
         GitRepository {
@@ -88,8 +88,9 @@ impl GitRepository {
 
     pub fn write_to_path(path: &Path) -> Result<GitRepository, GitError> {
         let repo = GitRepository::new(path);
-        GitRepository::create_repo_dir(&repo, path)?;
-
+        if path != path!(".") {
+            GitRepository::create_repo_dir(&repo, path)?;
+        }
         repo.repo_dir(&path!("branches"), true);
         repo.repo_dir(&path!("objects"), true);
         repo.repo_dir(&path!("refs/tags"), true);
@@ -147,7 +148,7 @@ impl GitRepository {
             GitError::GenericError(format!(
                 "Unable to load git config for repo: {}, {}",
                 conf_path.to_str().unwrap(),
-                e.to_string()
+                e
             ))
         })?;
         Ok(GitRepository {
@@ -167,7 +168,7 @@ impl GitRepository {
             let path = current.join(path!(".git"));
 
             if path.exists() {
-                return Ok(GitRepository::load(&current)?);
+                return GitRepository::load(current);
             }
             some = some.unwrap().parent().map(|p| p.to_path_buf());
         }
@@ -223,7 +224,7 @@ impl GitRepository {
         result.append(&mut obj.obj_type.serialize().to_vec());
         result.push(b' ');
         result.append(&mut obj.obj_type.serialize().to_vec());
-        result.push(0 as u8);
+        result.push(0_u8);
         result.append(&mut data);
 
         let sha = Sha1::from(&result).hexdigest();
@@ -232,7 +233,7 @@ impl GitRepository {
         let mut encoder = ZlibEncoder::new(Vec::new(), Compression::new(1));
 
         encoder
-            .write_all(&mut result)
+            .write_all(&result)
             .and(encoder.finish())
             .and_then(|compressed| {
                 let file = File::create(path)?;
@@ -343,6 +344,8 @@ impl GitRepository {
         }
 
         let version: u32 = u32::from_be_bytes(data[4..8].try_into().expect("Incorrect length"));
+
+        let n_entries: u32 = u32::from_be_bytes(data[8..12].try_into().expect("Invalid index file"));
         if version != 2 {
             return Err(GitError::GenericError(String::from(
                 "Unsupported version number.",
@@ -351,7 +354,7 @@ impl GitRepository {
         let entry_data = data[12..data.len() - 20].to_vec();
         let mut i = 0;
         let mut entries: Vec<GitIndex> = Vec::new();
-        while i + 62 < entry_data.len() {
+        for _k in 0..n_entries {
             let fields_end = i + 62;
             let ctime_s = BigEndian::read_u32(&entry_data[i..i + 4]);
             let ctime_n = BigEndian::read_u32(&entry_data[i + 4..i + 8]);

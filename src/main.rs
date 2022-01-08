@@ -11,15 +11,18 @@ pub mod macros;
 pub mod error;
 pub mod files;
 pub mod repository;
+pub mod tests;
 fn main() {
-    let yml = load_yaml!("args.yml");
+    let yml = load_yaml!("args.yaml");
     let app = App::from_yaml(yml).get_matches();
     if let Some(app) = app.subcommand_matches("init") {
-        init(&app);
+        init(app);
     } else if let Some(matches) = app.subcommand_matches("cat-file") {
         cat_file(matches).unwrap();
     } else if let Some(matches) = app.subcommand_matches("hash-object") {
         hash_object(matches).unwrap();
+    } else if let Some(matches) = app.subcommand_matches("ls-files") {
+        ls_files();
     }
 }
 
@@ -55,9 +58,8 @@ fn cat_file(matches: &ArgMatches) -> Result<(), GitError> {
                 ))
             })
         })
-        .and_then(|object_as_string| {
+        .map(|object_as_string| {
             println!("{}", object_as_string);
-            Ok(())
         })
 }
 
@@ -65,9 +67,8 @@ fn hash_object(matches: &ArgMatches) -> Result<(), GitError> {
     let mut repo = None;
 
     if matches.is_present("write") {
-        GitRepository::find().and_then(|found| {
+        GitRepository::find().map(|found| {
             repo = Some(found);
-            Ok(())
         })?;
     }
     let objtype = ObjType::deserialize(matches.value_of("type").unwrap().as_bytes());
@@ -76,10 +77,16 @@ fn hash_object(matches: &ArgMatches) -> Result<(), GitError> {
     let object = GitObject::new(objtype, &data);
 
     if let Some(repo) = repo {
-        GitRepository::write_object(&repo, &object).and_then(|sha| {
+        GitRepository::write_object(&repo, &object).map(|sha| {
             println!("{}", sha);
-            Ok(())
         })?;
     }
-    return Ok(());
+    Ok(())
+}
+fn ls_files() -> Result<(), GitError> {
+    let entries = GitRepository::read_index().unwrap();
+    for entry in entries {
+        println!("{}", entry.path);
+    }
+    Ok(())
 }
