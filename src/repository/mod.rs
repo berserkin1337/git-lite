@@ -4,17 +4,18 @@ use self::config::GitConfig;
 use self::object::{GitObject, ObjType, Serializable};
 use crate::files::is_dir_empty;
 use crate::{error::GitError, files};
+use byteorder::{BigEndian, ByteOrder};
+use chrono::{offset::Offset, offset::TimeZone, Local};
 use configparser::ini::Ini;
 use flate2::read::ZlibDecoder;
-
-use byteorder::{BigEndian, ByteOrder};
 use flate2::write::ZlibEncoder;
 use flate2::Compression;
 use sha1::Sha1;
 use std::collections::BTreeMap;
 use std::fs;
 use std::io::{Read, Write};
-use std::ops::RangeBounds;
+use std::os::unix::prelude::OsStrExt;
+use std::time::SystemTime;
 use std::{
     fs::{create_dir_all, File},
     path::{Path, PathBuf},
@@ -401,14 +402,137 @@ impl GitRepository {
         Ok(entries)
     }
     pub fn write_tree() -> Result<String, GitError> {
-        let tree_entries: Vec<String> = Vec::new();
+        let mut tree_entries: Vec<Vec<u8>> = Vec::new();
         let entries = GitRepository::read_index().unwrap();
         for entry in entries {
-            if entry.path.contains("/") {
+            if entry.path.contains('/') {
                 panic!("currently only supports a single, top-level directory");
+                //TODO: provide support for multiple level of  directories
             }
-            let mode_path = format!("{:o} {}", entry.mode, entry.path);
+            let mode_path = format!("{:o} {}", entry.mode, entry.path)
+                .as_bytes()
+                .to_vec();
+            let mut tree_entry = mode_path; //+ entry.sha1.as_bytes().to_vec();
+            tree_entry.push(b'\x00');
+            tree_entry.append(&mut entry.sha1.as_bytes().to_vec());
+            tree_entries.push(tree_entry);
         }
-        Ok(String::from("xqcL"))
+        let mut data: Vec<u8> = Vec::new();
+        for entry in tree_entries {
+            data.extend(entry.iter());
+        }
+
+        let repo = GitRepository::find().unwrap();
+        let tree_object = GitObject {
+            obj_type: ObjType::Tree,
+            data,
+        };
+        GitRepository::write_object(&repo, &tree_object)
     }
+    pub fn get_local_master_hash() -> Option<String> {
+        let master_path = path!(".git", "refs", "heads", "master");
+        let file_data = fs::read_to_string(master_path);
+        if file_data.is_ok() {
+            Some(file_data.unwrap())
+        } else {
+            None
+        }
+    }
+    pub fn commit(message: String, author: String) {
+        // Commits the current state of the index to master with a given message.It returns hash of a commit object.
+        let tree = GitRepository::write_tree().unwrap();
+        let parent = GitRepository::get_local_master_hash();
+        let timestamp = SystemTime::now()
+            .duration_since(SystemTime::UNIX_EPOCH)
+            .unwrap()
+            .as_secs();
+        let utc_offset = Local.timestamp(0, 0).offset().fix().local_minus_utc();
+        let author_time = format!(
+            "{} {}{:02}{:02}",
+            timestamp,
+            if utc_offset > 0 { '+' } else { '-' },
+            (utc_offset / 3600) as u32,
+            ((utc_offset / 60) as u32) % 60
+        );
+        let mut lines = vec![String::from("tree") + &tree];
+
+        if parent != None {
+            lines.push(String::from("parent") + &parent.unwrap());
+        }
+        lines.push(format!("author {} {} ", author, author_time));
+        lines.push(format!("commiter {} {} ", author, author_time));
+        lines.push(" ".to_owned());
+        lines.push(message);
+        lines.push(" ".to_owned());
+        let mut data = String::new();
+        for x in lines {
+            data.push_str(&x);
+            data.push('\n');
+        }
+        let data = data.as_bytes().to_vec();
+        let repo = GitRepository::find().unwrap();
+        let obj = GitObject {
+            obj_type: ObjType::Commit,
+            data,
+        };
+        let sha1 = GitRepository::write_object(&repo, &obj).expect("Unable to open the git object");
+        let master_path = path!(".git", "refs", "heads", "master");
+
+        let mut file = fs::OpenOptions::new()
+            .open(&master_path)
+            .expect("Cannot open the file to write commit info into.");
+        file.write_all(sha1.as_bytes())
+            .expect("Unable to open the git object");
+        println!("Commited to master: {:7}", sha1);
+    }
+
+    pub fn write_index(entries: &[GitIndex]) {
+        // Write list of GitIndex entries to the git index file.
+        let mut packed_entries: Vec<Vec<u8>> = Vec::new();
+
+        for entry in entries {
+            let mut packed_entry: Vec<u8> = vec![0; 40];
+            BigEndian::write_u32(&mut packed_entry[0..4], entry.ctime_s);
+            BigEndian::write_u32(&mut packed_entry[4..8], entry.ctime_n);
+            BigEndian::write_u32(&mut packed_entry[8..12], entry.mtime_s);
+            BigEndian::write_u32(&mut packed_entry[12..16], entry.mtime_n);
+            BigEndian::write_u32(&mut packed_entry[16..20], entry.dev);
+            BigEndian::write_u32(&mut packed_entry[20..24], entry.ino);
+            BigEndian::write_u32(&mut packed_entry[24..28], entry.mode);
+            BigEndian::write_u32(&mut packed_entry[28..32], entry.uid);
+            BigEndian::write_u32(&mut packed_entry[32..36], entry.gid);
+            BigEndian::write_u32(&mut packed_entry[36..40], entry.size);
+            packed_entry.append(&mut entry.sha1.as_bytes().to_vec());
+            packed_entry.append(&mut vec![0, 0]);
+            BigEndian::write_u16(&mut packed_entry[60..62], entry.flags);
+            packed_entry.append(&mut entry.path.as_bytes().to_vec());
+            let entry_len: usize =
+                ((62 + entry.path.as_bytes().to_vec().len() + 8) / 8) as usize * 8;
+            packed_entry.append(&mut vec![
+                b'\x00';
+                entry_len
+                    - 62
+                    - entry.path.as_bytes().to_vec().len()
+            ]);
+            packed_entries.push(packed_entry);
+        }
+
+        let mut header = "DIRC".as_bytes().to_vec();
+        header.append(&mut vec![0; 8]);
+        BigEndian::write_u32(&mut header[4..8], 2);
+        BigEndian::write_u32(&mut header[8..12], entries.len().try_into().unwrap());
+        let mut packed_data :Vec<u8>= header.iter().cloned().chain(packed_entries.iter().flatten().cloned()).collect();
+        let mut digest = Sha1::from(&packed_data).hexdigest().as_bytes().to_vec();
+        packed_data.append(&mut digest);
+        let path = path!(".git", "index");
+        let mut file = fs::OpenOptions::new()
+            .open(path)
+            .expect("Cannot open the file to write index info into.");
+        file.write_all(&packed_data).expect("Not able to write into the index file");
+    }
+    // TODO :implement the git add method.
+    // pub fn add_git(paths: &Vec<String>) {
+    //     let all_entries=  GitRepository::read_index().unwrap();
+
+    // }    
 }

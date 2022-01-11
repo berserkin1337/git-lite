@@ -21,7 +21,7 @@ fn main() {
         cat_file(matches).unwrap();
     } else if let Some(matches) = app.subcommand_matches("hash-object") {
         hash_object(matches).unwrap();
-    } else if let Some(matches) = app.subcommand_matches("ls-files") {
+    } else if let Some(_matches) = app.subcommand_matches("ls-files") {
         ls_files().unwrap();
     }
 }
