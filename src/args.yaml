@@ -53,3 +53,20 @@ subcommands:
 
   - ls-files:
       about: Lists the files in the git index
+
+
+  - commit:
+      about: Record changes to the repository
+      args:
+        - message :
+            short: m
+            long: message
+            takes_value: true
+            value_name: message
+            help: use the given message as the commit message
+        - author:
+            short: a
+            long: author
+            takes_value: true
+            value_name: author
+            help: use the given author as the author of the commit

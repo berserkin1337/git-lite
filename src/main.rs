@@ -23,6 +23,8 @@ fn main() {
         hash_object(matches).unwrap();
     } else if let Some(_matches) = app.subcommand_matches("ls-files") {
         ls_files().unwrap();
+    } else if let Some(matches) = app.subcommand_matches("commit") {
+        commit(matches);
     }
 }
 
@@ -89,4 +91,11 @@ fn ls_files() -> Result<(), GitError> {
         println!("{}", entry.path);
     }
     Ok(())
+}
+
+fn commit(matches: &ArgMatches) {
+    GitRepository::commit(
+        matches.value_of("message").unwrap().to_string(),
+        matches.value_of("author").unwrap().to_string(),
+    );
 }
