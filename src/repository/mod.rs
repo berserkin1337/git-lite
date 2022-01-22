@@ -40,6 +40,7 @@ pub struct GitIndex {
     pub gid: u32,
     pub size: u32,
     pub sha1: String,
+    pub sha1_vec: Vec<u8>,
     pub flags: u16,
     pub path: String,
 }
@@ -225,7 +226,7 @@ impl GitRepository {
         let mut result = Vec::new();
         result.append(&mut obj.obj_type.serialize().to_vec());
         result.push(b' ');
-        result.append(&mut obj.obj_type.serialize().to_vec());
+        result.append(&mut data.len().to_string().to_ascii_uppercase().as_bytes().to_vec());
         result.push(0_u8);
         result.append(&mut data);
 
@@ -378,6 +379,7 @@ impl GitRepository {
                 write!(w,"{:02x}",b).unwrap();
             }
             let sha1 = String::from_utf8(w).unwrap();
+            let sha1_vec = entry_data[i+40..i+60].to_vec();
             let flags = BigEndian::read_u16(&entry_data[i + 60..i + 62]);
             let mut path_end = fields_end;
             while entry_data[path_end] != 0 {
@@ -397,6 +399,7 @@ impl GitRepository {
                 gid,
                 size,
                 sha1,
+                sha1_vec,
                 flags,
                 path: path.to_string(),
             });
@@ -413,13 +416,15 @@ impl GitRepository {
                 panic!("currently only supports a single, top-level directory");
                 //TODO: provide support for multiple level of  directories
             }
-            let mode_path = format!("{:o} {}", entry.mode, entry.path)
+            let mode_path:Vec<u8> = format!("{:o} {}", entry.mode, entry.path)
                 .as_bytes()
                 .to_vec();
-            let mut tree_entry = mode_path; //+ entry.sha1.as_bytes().to_vec();
+            let mut tree_entry = mode_path; 
             tree_entry.push(b'\x00');
-            println!("{}", entry.sha1);
-            tree_entry.append(&mut entry.sha1.as_bytes().to_vec());
+            // println!("{:o} {} {}",entry.mode,entry.path,entry.sha1);
+            // println!("{}", entry.sha1);
+            let mut sha1_vec = entry.sha1_vec;
+            tree_entry.append(&mut sha1_vec);
             tree_entries.push(tree_entry);
         }
         let mut data: Vec<u8> = Vec::new();
@@ -446,6 +451,7 @@ impl GitRepository {
     pub fn commit(message: String, author: String) {
         // Commits the current state of the index to master with a given message.It returns hash of a commit object.
         let tree = GitRepository::write_tree().unwrap();
+        // println!("tree: {}",tree);
         let parent = GitRepository::get_local_master_hash();
         let timestamp = SystemTime::now()
             .duration_since(SystemTime::UNIX_EPOCH)
@@ -459,13 +465,14 @@ impl GitRepository {
             (utc_offset / 3600) as u32,
             ((utc_offset / 60) as u32) % 60
         );
-        let mut lines = vec![String::from("tree") + &tree];
+        let mut lines = vec![String::from("tree ") + &tree];
 
         if parent != None {
-            lines.push(String::from("parent") + &parent.unwrap());
+            let parent_string = parent.unwrap();
+            lines.push(String::from("parent ") + &parent_string[..parent_string.len()-1]);
         }
-        lines.push(format!("author {} {} ", author, author_time));
-        lines.push(format!("commiter {} {} ", author, author_time));
+        lines.push(format!("author {} {}", author, author_time));
+        lines.push(format!("commiter {} {}", author, author_time));
         lines.push(" ".to_owned());
         lines.push(message);
         let mut data = String::new();
@@ -484,11 +491,6 @@ impl GitRepository {
         let master_path = path!(".git", "refs", "heads", "master");
         fs::write(master_path, sha1.as_bytes())
             .expect("Cannot open the file to write commit info into");
-        // let mut file = fs::OpenOptions::new()
-        //     .open(&master_path)
-        //     .expect("Cannot open the file to write commit info into.");
-        // file.write_all(sha1.as_bytes())
-        //     .expect("Unable to open the git object");
         println!("Commited to master: {:7}", sha1);
     }
 

@@ -25,8 +25,7 @@ fn main() {
         ls_files().unwrap();
     } else if let Some(matches) = app.subcommand_matches("commit") {
         commit(matches);
-    }
-}
+    } }
 
 fn init(matches: &ArgMatches) {
     if matches.is_present("path") {
