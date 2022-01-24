@@ -53,7 +53,7 @@ impl Serializable for ObjType {
 }
 
 impl GitObject {
-    pub fn new(obj_type:ObjType,data:&[u8]) -> GitObject {
+    pub fn new(obj_type: ObjType, data: &[u8]) -> GitObject {
         GitObject {
             obj_type,
             data: data.to_vec(),

@@ -4,8 +4,7 @@ use std::{
     path::PathBuf,
 };
 
-
-#[derive(Debug,Clone)]
+#[derive(Debug, Clone)]
 pub enum GitError {
     UnknownError,
     GenericError(String),
@@ -29,4 +28,4 @@ impl Display for GitError {
     }
 }
 
-impl Error for GitError{}
+impl Error for GitError {}

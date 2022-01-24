@@ -15,8 +15,8 @@ pub mod test;
 fn main() {
     let yml = load_yaml!("args.yaml");
     let app = App::from_yaml(yml).get_matches();
-    if let Some(app) = app.subcommand_matches("init") {
-        init(app);
+    if let Some(matches) = app.subcommand_matches("init") {
+        init(matches);
     } else if let Some(matches) = app.subcommand_matches("cat-file") {
         cat_file(matches).unwrap();
     } else if let Some(matches) = app.subcommand_matches("hash-object") {
@@ -25,7 +25,10 @@ fn main() {
         ls_files().unwrap();
     } else if let Some(matches) = app.subcommand_matches("commit") {
         commit(matches);
-    } }
+    } else {
+        App::from_yaml(yml).print_help().unwrap();
+    }
+}
 
 fn init(matches: &ArgMatches) {
     if matches.is_present("path") {

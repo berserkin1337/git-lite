@@ -31,15 +31,16 @@ pub fn cwd() -> Result<PathBuf, GitError> {
         .map_err(|_| GitError::GenericError("Cannot open current working directory!".to_owned()))
 }
 
-pub fn read_data(path: &Path) -> Result<Vec<u8>,  GitError> {
+pub fn read_data(path: &Path) -> Result<Vec<u8>, GitError> {
     let mut data = Vec::new();
 
     File::open(&path)
-        .and_then(|mut file| {
-            file.read_to_end(&mut data)
-        })
+        .and_then(|mut file| file.read_to_end(&mut data))
         .and(Ok(data))
-        .map_err(|e|{
-            GitError::PathError(format!("Could not read file {}", e.to_string()), path.to_path_buf())
+        .map_err(|e| {
+            GitError::PathError(
+                format!("Could not read file {}", e.to_string()),
+                path.to_path_buf(),
+            )
         })
 }

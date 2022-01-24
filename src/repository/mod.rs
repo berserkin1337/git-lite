@@ -226,7 +226,14 @@ impl GitRepository {
         let mut result = Vec::new();
         result.append(&mut obj.obj_type.serialize().to_vec());
         result.push(b' ');
-        result.append(&mut data.len().to_string().to_ascii_uppercase().as_bytes().to_vec());
+        result.append(
+            &mut data
+                .len()
+                .to_string()
+                .to_ascii_uppercase()
+                .as_bytes()
+                .to_vec(),
+        );
         result.push(0_u8);
         result.append(&mut data);
 
@@ -374,12 +381,12 @@ impl GitRepository {
             //     .split(", ")
             //     .collect();
             // let sha1 = s_ha1[1..s_ha1.len() - 1].to_owned();
-            let mut w:Vec<u8> = Vec::new();
-            for b in &entry_data[i+40..i+60] {
-                write!(w,"{:02x}",b).unwrap();
+            let mut w: Vec<u8> = Vec::new();
+            for b in &entry_data[i + 40..i + 60] {
+                write!(w, "{:02x}", b).unwrap();
             }
             let sha1 = String::from_utf8(w).unwrap();
-            let sha1_vec = entry_data[i+40..i+60].to_vec();
+            let sha1_vec = entry_data[i + 40..i + 60].to_vec();
             let flags = BigEndian::read_u16(&entry_data[i + 60..i + 62]);
             let mut path_end = fields_end;
             while entry_data[path_end] != 0 {
@@ -416,10 +423,10 @@ impl GitRepository {
                 panic!("currently only supports a single, top-level directory");
                 //TODO: provide support for multiple level of  directories
             }
-            let mode_path:Vec<u8> = format!("{:o} {}", entry.mode, entry.path)
+            let mode_path: Vec<u8> = format!("{:o} {}", entry.mode, entry.path)
                 .as_bytes()
                 .to_vec();
-            let mut tree_entry = mode_path; 
+            let mut tree_entry = mode_path;
             tree_entry.push(b'\x00');
             // println!("{:o} {} {}",entry.mode,entry.path,entry.sha1);
             // println!("{}", entry.sha1);
@@ -469,7 +476,7 @@ impl GitRepository {
 
         if parent != None {
             let parent_string = parent.unwrap();
-            lines.push(String::from("parent ") + &parent_string[..parent_string.len()-1]);
+            lines.push(String::from("parent ") + &parent_string[..parent_string.len() - 1]);
         }
         lines.push(format!("author {} {}", author, author_time));
         lines.push(format!("commiter {} {}", author, author_time));
