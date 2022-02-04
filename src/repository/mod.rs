@@ -14,6 +14,7 @@ use sha1::Sha1;
 use std::collections::BTreeMap;
 use std::fs;
 use std::io::{Read, Write};
+use std::os::unix::prelude::MetadataExt;
 use std::time::SystemTime;
 use std::{
     fs::{create_dir_all, File},
@@ -501,7 +502,7 @@ impl GitRepository {
         println!("Commited to master: {:7}", sha1);
     }
 
-    pub fn write_index(entries: &[GitIndex]) {
+    pub fn write_index(entries: &Vec<GitIndex>) {
         // Write list of GitIndex entries to the git index file.
         let mut packed_entries: Vec<Vec<u8>> = Vec::new();
 
@@ -551,8 +552,43 @@ impl GitRepository {
             .expect("Not able to write into the index file");
     }
     // TODO :implement the git add method.
-    // pub fn add_git(paths: &Vec<String>) {
-    //     let all_entries=  GitRepository::read_index().unwrap();
-
-    // }
+    pub fn add_git(paths: &Vec<String>) {
+        let all_entries = GitRepository::read_index().unwrap();
+        let mut entries: Vec<GitIndex> = Vec::new();
+        for e in all_entries {
+            if paths.contains(&e.path) {
+                entries.push(e);
+            }
+        }
+        for path in paths {
+            let obj = GitObject {
+                obj_type: ObjType::Blob,
+                data: files::read_data(&path!(path)).unwrap(),
+            };
+            let repo = GitRepository::find().unwrap();
+            let sha1 = GitRepository::write_object(&repo, &obj).unwrap();
+            let flags = path.as_bytes().len();
+            assert!(flags < (1 << 12));
+            let stat = fs::metadata(path).unwrap();
+            let entry = GitIndex {
+                ctime_s: u32::try_from(stat.ctime()).ok().unwrap(),
+                ctime_n: 0,
+                mtime_s: u32::try_from(stat.mtime()).ok().unwrap(),
+                mtime_n: 0,
+                dev: u32::try_from(stat.dev()).ok().unwrap(),
+                ino: u32::try_from(stat.ino()).ok().unwrap(),
+                mode: u32::try_from(stat.dev()).ok().unwrap(),
+                uid: stat.uid(),
+                gid: stat.gid(),
+                size: u32::try_from(stat.size()).ok().unwrap(),
+                sha1: sha1.clone(),
+                sha1_vec: sha1.as_bytes().to_vec(),
+                flags: u16::try_from(flags).ok().unwrap(),
+                path: path.to_string(),
+            };
+            entries.push(entry);
+        }
+        GitRepository::write_index(&entries);
+    }
+    //
 }
