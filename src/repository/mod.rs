@@ -196,9 +196,9 @@ impl GitRepository {
         })?;
 
         let mut buf = Vec::new();
-        ZlibDecoder::new(file).read_to_end(&mut buf).map_err(|e| {
-            GitError::GenericError(format!("Could not read object data: {}", e))
-        })?;
+        ZlibDecoder::new(file)
+            .read_to_end(&mut buf)
+            .map_err(|e| GitError::GenericError(format!("Could not read object data: {}", e)))?;
         let space = buf.iter().position(|b| b == &b' ').unwrap();
         let null = buf.iter().position(|b| b == &b'\x00').unwrap();
         let bytes: &[u8] = buf.as_ref();
@@ -255,8 +255,7 @@ impl GitRepository {
             .map_err(|e| {
                 GitError::GenericError(format!(
                     "Unable to compress and save object data: {} - {}",
-                    sha,
-                    e
+                    sha, e
                 ))
             })
     }
@@ -284,14 +283,13 @@ impl GitRepository {
             let mut it = space_pos + 1;
             let end_pos = loop {
                 let newline = buf[it..].iter().position(|b| b == &b'\n');
-                if newline.is_none() {
-                    break buf.len();
-                } else {
-                    let newline_pos = newline.unwrap();
+                if let Some(newline_pos) = newline {
                     if buf[newline_pos + 1] != b' ' {
                         break newline_pos;
                     }
                     it = newline_pos + 1;
+                } else {
+                    break buf.len();
                 }
             };
             let mut value =
@@ -450,9 +448,10 @@ impl GitRepository {
     pub fn get_local_master_hash() -> Option<String> {
         let master_path = path!(".git", "refs", "heads", "master");
         let file_data = fs::read_to_string(master_path);
-        if file_data.is_ok() {
-            Some(file_data.unwrap())
-        } else {
+        if let Ok(data) = file_data{
+            Some(data)
+        }
+        else{
             None
         }
     }
