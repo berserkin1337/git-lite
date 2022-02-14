@@ -39,7 +39,7 @@ pub fn read_data(path: &Path) -> Result<Vec<u8>, GitError> {
         .and(Ok(data))
         .map_err(|e| {
             GitError::PathError(
-                format!("Could not read file {}", e.to_string()),
+                format!("Could not read file {}", e),
                 path.to_path_buf(),
             )
         })

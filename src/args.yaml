@@ -1,4 +1,4 @@
-name: gitlet
+name: git-lite
 version: "1.0"
 author: Aviral Gupta <gaviral373@gmail.com>
 about: implementation of git in rust.

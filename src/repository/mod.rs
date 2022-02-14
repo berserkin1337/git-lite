@@ -197,7 +197,7 @@ impl GitRepository {
 
         let mut buf = Vec::new();
         ZlibDecoder::new(file).read_to_end(&mut buf).map_err(|e| {
-            GitError::GenericError(format!("Could not read object data: {}", e.to_string()))
+            GitError::GenericError(format!("Could not read object data: {}", e))
         })?;
         let space = buf.iter().position(|b| b == &b' ').unwrap();
         let null = buf.iter().position(|b| b == &b'\x00').unwrap();
@@ -256,7 +256,7 @@ impl GitRepository {
                 GitError::GenericError(format!(
                     "Unable to compress and save object data: {} - {}",
                     sha,
-                    e.to_string()
+                    e
                 ))
             })
     }
@@ -502,7 +502,7 @@ impl GitRepository {
         println!("Commited to master: {:7}", sha1);
     }
 
-    pub fn write_index(entries: &Vec<GitIndex>) {
+    pub fn write_index(entries: &[GitIndex]) {
         // Write list of GitIndex entries to the git index file.
         let mut packed_entries: Vec<Vec<u8>> = Vec::new();
 
@@ -551,8 +551,7 @@ impl GitRepository {
         file.write_all(&packed_data)
             .expect("Not able to write into the index file");
     }
-    // TODO :implement the git add method.
-    pub fn add_git(paths: &Vec<String>) {
+    pub fn add_git(paths: &[String]) {
         let all_entries = GitRepository::read_index().unwrap();
         let mut entries: Vec<GitIndex> = Vec::new();
         for e in all_entries {
