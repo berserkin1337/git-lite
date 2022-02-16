@@ -13,3 +13,4 @@ sha1 = { version = "0.6.0", features = ["std"] }
 byteorder = "1.4.3"
 chrono = "0.4.19"
 binascii = "0.1.4"
+hex = "0.4.3"

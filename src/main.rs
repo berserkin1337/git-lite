@@ -4,7 +4,7 @@ use clap::{arg, App};
 use clap::{AppSettings, Arg, ArgMatches};
 
 use repository::object::{GitObject, ObjType, Serializable};
-use std::path::{Path};
+use std::path::Path;
 
 #[macro_use]
 pub mod macros;
@@ -13,21 +13,6 @@ pub mod files;
 pub mod repository;
 pub mod test;
 fn main() {
-    // let yml = load_yaml!("args.yaml");
-    // let app = App::from_yaml(yml).get_matches();
-    // if let Some(matches) = app.subcommand_matches("init") {
-    //     init(matches);
-    // } else if let Some(matches) = app.subcommand_matches("cat-file") {
-    //     cat_file(matches).unwrap();
-    // } else if let Some(matches) = app.subcommand_matches("hash-object") {
-    //     hash_object(matches).unwrap();
-    // } else if let Some(_matches) = app.subcommand_matches("ls-files") {
-    //     ls_files().unwrap();
-    // } else if let Some(matches) = app.subcommand_matches("commit") {
-    //     commit(matches);
-    // } else {
-    //     App::from_yaml(yml).print_help().unwrap();
-    // }
     let mut matches = App::new(env!("CARGO_CRATE_NAME"))
         .setting(AppSettings::ArgRequiredElseHelp)
         .about("implementation of git in rust.")
@@ -107,7 +92,7 @@ fn main() {
         .subcommand(
             App::new("add")
                 .about("Add file contents to the index")
-                .arg(arg!(<path> ... "Stuff to add").allow_invalid_utf8(true).short('p')),
+                .arg(arg!(<path> ... "Stuff to add").short('p')),
         );
     let get = matches.get_matches_mut();
 
@@ -213,6 +198,6 @@ fn git_add(sub_matches: &ArgMatches) {
         .split_whitespace()
         .map(str::to_string)
         .collect();
-    
+
     GitRepository::add_git(&paths)
 }
