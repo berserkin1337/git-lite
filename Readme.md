@@ -1,8 +1,8 @@
-# Building
+## Building
 ```bash
 cargo build 
 ```
-# Running
+## Running
 ```bash
 ./target/debug/git-lite
 git_lite 
@@ -23,28 +23,28 @@ SUBCOMMANDS:
     init           Creates a new git repository or reinitializes an existing one.
     ls-files       Lists the files in the git index
 ```
-# Initiallizing a repository
+## Initiallizing a repository
 ```bash
 $ git_lite init
 ```
 
-# Adding a file to the index
+## Adding a file to the index
 ```bash
 $ echo "hello world" > hello.txt
 $ git_lite add hello.txt
 ```
-# View the files in the index
+## View the files in the index
 ```bash
 $ git_lite ls-files
 hello.txt
 ```
-# Commiting the files in the index
+## Commiting the files in the index
 ```bash
 $ git_lite commit -m "initial commit" -a "aviral"
 Commited to master: 79873421ae6fb1a30c4faeb5b5fe54ad8f8e89eb
 ```
 
-# References
+## References
 - [Git Internals](https://git-scm.com/book/en/v2/Git-Internals-Plumbing-and-Porcelain)
 - [the-git-parable](https://tom.preston-werner.com/2009/05/19/the-git-parable.html)
 - [git from the bottom up](https://jwiegley.github.io/git-from-the-bottom-up/)
