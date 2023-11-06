@@ -553,7 +553,7 @@ impl GitRepository {
         let all_entries = all_entries.unwrap();
         let mut entries: Vec<GitIndex> = Vec::new();
         for e in all_entries {
-            if paths.contains(&e.path) {
+            if !paths.contains(&e.path) {
                 entries.push(e);
             }
         }
